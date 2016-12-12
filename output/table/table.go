@@ -27,6 +27,7 @@ AZ {{ .az }} ({{ .azblock }}):
 		if err != nil {
 			panic(err)
 		}
+
 		infomap := make(map[string]string)
 		infomap["az"] = string(k + 65)
 
