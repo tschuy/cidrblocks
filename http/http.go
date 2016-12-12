@@ -31,18 +31,17 @@ func handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		block := cidr.DivideSubnets(ipnet, 4)
-		vpccidr, allocated := cidr.AllocateSubnets(block, 4)
+		subnet := cidr.Divide(ipnet, 4, 4)
 
 		var cidrOut string
 
-		functions := map[string]func(vpccidr *net.IPNet, alloc []map[string]*net.IPNet) (string, error){
+		functions := map[string]func(cidr.Subnet) (string, error){
 			"table":     table.Output,
 			"terraform": terraform.Output,
 		}
 
 		if function, ok := functions[format]; ok {
-			cidrOut, err = function(vpccidr, allocated)
+			cidrOut, err = function(subnet)
 		} else {
 			http.Error(w, fmt.Sprintf(`{"error": format %s not recognized}`, format), http.StatusBadRequest)
 			return

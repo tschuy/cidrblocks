@@ -4,9 +4,16 @@ import (
 	"bytes"
 	"html/template"
 	"net"
+
+	"github.com/tschuy/cidrblocks/cidr"
 )
 
-func Output(vpccidr *net.IPNet, alloc []map[string]*net.IPNet) (string, error) {
+type block struct {
+	Addr *net.IPNet
+	Type string
+}
+
+func Output(subnet cidr.Subnet) (string, error) {
 	var buf bytes.Buffer
 	tmplPreamble, err := template.New("preamble").Parse(`variable "cidr_block" {
     type = "string"
@@ -60,13 +67,13 @@ map_public_ip_on_launch = false
 		return "", err
 	}
 
-	tmplPreamble.Execute(&buf, map[string]string{"cidrblock": vpccidr.String()})
-	for k, v := range alloc {
-		for _, t := range []string{"public", "private", "protected"} {
+	tmplPreamble.Execute(&buf, map[string]string{"cidrblock": subnet.VPC.String()})
+	for k, v := range subnet.AvailabilityZones {
+		for _, t := range []block{{v.Public, "public"}, {v.Private, "private"}, {v.Protected, "protected"}} {
 			tmplAZ.Execute(&buf, map[string]string{
 				"az":             string(k + 65),
-				"cidrblockInner": v[t].String(),
-				"function":       t,
+				"cidrblockInner": t.Addr.String(),
+				"function":       t.Type,
 			})
 		}
 	}

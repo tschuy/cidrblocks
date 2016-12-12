@@ -8,22 +8,37 @@ import (
 	"github.com/mhuisi/ipv4utils"
 )
 
-func AllocateSubnets(block map[string][]*net.IPNet, azs int) (*net.IPNet, []map[string]*net.IPNet) {
-	var allocated []map[string]*net.IPNet // map to slices of IPNets
-	vpccidr := block["l1"][0]
+type Subnet struct {
+	AvailabilityZones []AvailabilityZone
+	VPC               *net.IPNet
+}
+
+type AvailabilityZone struct {
+	Public    *net.IPNet
+	Private   *net.IPNet
+	Protected *net.IPNet
+	AZBlock   *net.IPNet
+}
+
+func Divide(ipnet *net.IPNet, depth int, azs int) Subnet {
+	block := divideSubnets(ipnet, depth)
+
+	var subnet Subnet
+	subnet.VPC = block["l1"][0]
+
 	for az := 0; az < azs; az++ {
-		allocated = append(allocated, map[string]*net.IPNet{
-			"azblock":   block["l2"][0+az*1],
-			"private":   block["l3"][0+az*2],
-			"public":    block["l4"][2+az*4],
-			"protected": block["l5"][6+az*8],
+		subnet.AvailabilityZones = append(subnet.AvailabilityZones, AvailabilityZone{
+			AZBlock:   block["l2"][0+az*1],
+			Private:   block["l3"][0+az*2],
+			Public:    block["l4"][2+az*4],
+			Protected: block["l5"][6+az*8],
 		})
 	}
 
-	return vpccidr, allocated
+	return subnet
 }
 
-func DivideSubnets(ipnet *net.IPNet, depth int) map[string][]*net.IPNet {
+func divideSubnets(ipnet *net.IPNet, depth int) map[string][]*net.IPNet {
 	block := make(map[string][]*net.IPNet) // map to slices of IPNets
 	_, _ = ipnet.Mask.Size()               // TODO subnet
 
