@@ -1,4 +1,4 @@
-package cidr
+package subnet
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ type AvailabilityZone struct {
 	AZBlock   *net.IPNet
 }
 
-func Divide(ipnet *net.IPNet, depth int, azs int) Subnet {
+func New(ipnet *net.IPNet, depth int, azs int) Subnet {
 	block := divideSubnets(ipnet, depth)
 
 	var subnet Subnet

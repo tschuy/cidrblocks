@@ -7,17 +7,17 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/tschuy/cidrblocks/cidr"
+	"github.com/tschuy/cidrblocks/subnet"
 )
 
-func Output(subnet cidr.Subnet) (string, error) {
+func Output(sn subnet.Subnet) (string, error) {
 
 	var buf bytes.Buffer
 
-	vpcr := fmt.Sprintf("VPC Range - %s\n", subnet.VPC.String())
+	vpcr := fmt.Sprintf("VPC Range - %s\n", sn.VPC.String())
 	buf.WriteString(vpcr)
 
-	for k, v := range subnet.AvailabilityZones {
+	for k, v := range sn.AvailabilityZones {
 		tmpl, err := template.New("table").Parse(`
 AZ {{ .az }} ({{ .azblock }}):
     {{ .private}} (Private - {{ .privcount }} addresses)

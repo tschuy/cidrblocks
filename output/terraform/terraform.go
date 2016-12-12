@@ -5,7 +5,7 @@ import (
 	"html/template"
 	"net"
 
-	"github.com/tschuy/cidrblocks/cidr"
+	"github.com/tschuy/cidrblocks/subnet"
 )
 
 type block struct {
@@ -13,7 +13,7 @@ type block struct {
 	Type string
 }
 
-func Output(subnet cidr.Subnet) (string, error) {
+func Output(sn subnet.Subnet) (string, error) {
 	var buf bytes.Buffer
 	tmplPreamble, err := template.New("preamble").Parse(`variable "cidr_block" {
     type = "string"
@@ -67,8 +67,8 @@ map_public_ip_on_launch = false
 		return "", err
 	}
 
-	tmplPreamble.Execute(&buf, map[string]string{"cidrblock": subnet.VPC.String()})
-	for k, v := range subnet.AvailabilityZones {
+	tmplPreamble.Execute(&buf, map[string]string{"cidrblock": sn.VPC.String()})
+	for k, v := range sn.AvailabilityZones {
 		for _, t := range []block{{v.Public, "public"}, {v.Private, "private"}, {v.Protected, "protected"}} {
 			tmplAZ.Execute(&buf, map[string]string{
 				"az":             string(k + 65),
