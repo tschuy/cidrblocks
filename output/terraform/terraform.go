@@ -71,7 +71,7 @@ map_public_ip_on_launch = false
 	for k, v := range sn.AvailabilityZones {
 		for _, t := range []block{{v.Public, "public"}, {v.Private, "private"}, {v.Protected, "protected"}} {
 			tmplAZ.Execute(&buf, map[string]string{
-				"az":             string(k + 65),
+				"az":             subnet.AZName(k),
 				"cidrblockInner": t.Addr.String(),
 				"function":       t.Type,
 			})

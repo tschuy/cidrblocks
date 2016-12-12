@@ -29,7 +29,7 @@ AZ {{ .az }} ({{ .azblock }}):
 		}
 
 		infomap := make(map[string]string)
-		infomap["az"] = string(k + 65)
+		infomap["az"] = subnet.AZName(k)
 
 		infomap["azblock"] = v.AZBlock.String()
 

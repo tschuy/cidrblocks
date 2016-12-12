@@ -20,6 +20,29 @@ type AvailabilityZone struct {
 	AZBlock   *net.IPNet
 }
 
+func AZName(k int) string {
+	var char int
+	// for 26, = 1, for 27, = 2
+	// log(a)/log(b) = log base b of a
+	// start at 1 instead of 0
+	strLen := int(math.Floor(math.Log(float64(k))/math.Log(26) + 1))
+	if strLen < 0 {
+		// unfortunately, log(0) = -inf
+		// we can't just add one to the log, as this would make k=26 have strLen
+		// of 2, and not 1
+		strLen = 1
+	}
+	name := make([]byte, strLen)
+	k = k + 1 // so we start at A and not at space
+	for i := strLen; i > 0; i-- {
+		k = k - 1
+		char = k % 26
+		k = k / 26
+		name[i-1] = byte(char + 65)
+	}
+	return string(name)
+}
+
 func New(ipnet *net.IPNet, azs int) (*Subnet, error) {
 
 	// to split the block into N availability zones evenly,
