@@ -14,14 +14,6 @@ import (
 	"github.com/tschuy/cidrblocks/subnet"
 )
 
-func Serve() {
-	http.HandleFunc("/", handle)
-	err := http.ListenAndServe(":8087", nil)
-	if err != nil {
-		panic(err)
-	}
-}
-
 type param struct {
 	format string
 	ipnet  *net.IPNet
@@ -31,6 +23,14 @@ type param struct {
 
 type JsonError struct {
 	Err string `json:"error"`
+}
+
+func Serve(address string) {
+	http.HandleFunc("/", handle)
+	err := http.ListenAndServe(address, nil)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func parseParams(r *http.Request) (*param, error) {

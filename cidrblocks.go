@@ -1,5 +1,12 @@
 package main
 
+import (
+	"strconv"
+
+	"github.com/spf13/cobra"
+	"github.com/tschuy/cidrblocks/http"
+)
+
 // pretty print -- aka outputTable
 // Terraform
 // cloud formation
@@ -11,10 +18,35 @@ package main
 // to be super cool, make machines with cloud formation and then make a cloud config to curl and show it's working
 // AWS commands -- aws ec2 create-subnet, etc
 
-// SHOULD be useable as a not-web-service
-
-import "github.com/tschuy/cidrblocks/http"
+var azs int
+var port int
+var cidr string
+var format string
+var rootCmd *cobra.Command
 
 func main() {
-	http.Serve()
+
+	rootCmd = &cobra.Command{
+		Long: `Split a CIDR block into availability zones and public/private/protected.
+
+--cidr flag required.`,
+		Run: cli,
+	}
+	rootCmd.Flags().StringVarP(&cidr, "cidr", "c", "required", "[required] root cidr block (ex: 10.0.0.0/8)")
+	rootCmd.Flags().IntVarP(&azs, "azs", "a", 4, "number of availability zones (power of two)")
+	rootCmd.Flags().StringVarP(&format, "format", "f", "table", "format of output (table or terraform)")
+
+	serveCmd := &cobra.Command{
+		Use:  "serve",
+		Long: `Start an HTTP server serving over port specified with --port`,
+		Run: func(cmd *cobra.Command, args []string) {
+			http.Serve(":" + strconv.Itoa(port))
+		},
+	}
+
+	serveCmd.Flags().IntVarP(&port, "port", "p", 8087, "port to serve on")
+
+	rootCmd.AddCommand(serveCmd)
+	rootCmd.Execute()
+
 }
