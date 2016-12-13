@@ -1,10 +1,17 @@
 package main
 
 import (
+	"fmt"
+	"net"
+	"os"
 	"strconv"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/tschuy/cidrblocks/http"
+	"github.com/tschuy/cidrblocks/output/table"
+	"github.com/tschuy/cidrblocks/output/terraform"
+	"github.com/tschuy/cidrblocks/subnet"
 )
 
 // pretty print -- aka outputTable
@@ -27,12 +34,13 @@ var rootCmd *cobra.Command
 func main() {
 
 	rootCmd = &cobra.Command{
-		Long: `Split a CIDR block into availability zones and public/private/protected.
-
---cidr flag required.`,
-		Run: cli,
+		Long: `Split a CIDR block into availability zones and public/private/protected.`,
+		Run:  cli,
 	}
-	rootCmd.Flags().StringVarP(&cidr, "cidr", "c", "required", "[required] root cidr block (ex: 10.0.0.0/8)")
+
+	red := color.New(color.Bold).SprintFunc()
+
+	rootCmd.Flags().StringVarP(&cidr, "cidr", "c", "", red("[required] root cidr block (ex: 10.0.0.0/8)"))
 	rootCmd.Flags().IntVarP(&azs, "azs", "a", 4, "number of availability zones (power of two)")
 	rootCmd.Flags().StringVarP(&format, "format", "f", "table", "format of output (table or terraform)")
 
@@ -49,4 +57,48 @@ func main() {
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.Execute()
 
+}
+
+func cli(cmd *cobra.Command, args []string) {
+	if cidr == "" {
+		// empty string is the default
+		help := rootCmd.HelpFunc()
+		help(rootCmd, []string{})
+
+		os.Exit(1)
+	}
+
+	_, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	sn, err := subnet.New(ipnet, azs)
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	functions := map[string]func(subnet.Subnet) (string, error){
+		"table":     table.Output,
+		"terraform": terraform.Output,
+	}
+
+	var cidrOut string
+
+	if function, ok := functions[format]; ok {
+		cidrOut, err = function(*sn)
+	} else {
+		fmt.Println(fmt.Sprintf("format %s not recognized", format))
+		os.Exit(1)
+	}
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	fmt.Println(cidrOut)
 }

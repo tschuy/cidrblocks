@@ -56,6 +56,11 @@ func New(ipnet *net.IPNet, azs int) (*Subnet, error) {
 		return nil, errors.New("AZs must be a power of 2")
 	}
 
+	maskSize, _ := ipnet.Mask.Size()
+	if azs+maskSize > 31 {
+		return nil, errors.New("the number of availability zones plus the CIDR mask size cannot be greater than 31!")
+	}
+
 	block, err := divideSubnets(ipnet, start+3)
 	if err != nil {
 		return nil, err
