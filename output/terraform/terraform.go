@@ -9,7 +9,7 @@ import (
 )
 
 type block struct {
-	Addr *net.IPNet
+	Addr net.IPNet
 	Type string
 }
 

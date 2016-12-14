@@ -1,11 +1,10 @@
 package subnet
 
 import (
-	"errors"
 	"math"
 	"net"
 
-	"github.com/mhuisi/ipv4utils"
+	"github.com/dghubble/ipnets"
 )
 
 type Subnet struct {
@@ -14,13 +13,15 @@ type Subnet struct {
 }
 
 type AvailabilityZone struct {
-	Public    *net.IPNet
-	Private   *net.IPNet
-	Protected *net.IPNet
-	AZBlock   *net.IPNet
+	Public    net.IPNet
+	Private   net.IPNet
+	Protected net.IPNet
+	AZBlock   net.IPNet
 }
 
 func AZName(k int) string {
+	// for the ever-present fear that you might suddenly use more than 26
+	// availability zones!
 	var char int
 	// for 26, = 1, for 27, = 2
 	// log(a)/log(b) = log base b of a
@@ -44,69 +45,40 @@ func AZName(k int) string {
 }
 
 func New(ipnet *net.IPNet, azs int) (*Subnet, error) {
-
-	// to split the block into N availability zones evenly,
-	// each zone needs to contain 1/n of the available IPs.
-	// since each level of the block is split into 2^(level+1) even pieces,
-	// if we have 8 AZs, we need to choose the 2nd level -- as 2^(2+1) = 8.
-
-	// this formula only works when AZs are a power of two.
-	start := int(math.Log2(float64(azs)))
-	if math.Exp2(float64(start)) != float64(azs) {
-		return nil, errors.New("AZs must be a power of 2")
-	}
-
-	maskSize, _ := ipnet.Mask.Size()
-	if azs+maskSize > 31 {
-		return nil, errors.New("the number of availability zones plus the CIDR mask size cannot be greater than 31!")
-	}
-
-	block, err := divideSubnets(ipnet, start+3)
+	// split into the number of necessary blocks for AZs
+	azblocks, err := ipnets.SubnetInto(*ipnet, azs)
 	if err != nil {
 		return nil, err
 	}
 
 	var subnet Subnet
-	subnet.VPC = block[0][0]
+	subnet.VPC = ipnet
 
 	for az := 0; az < azs; az++ {
+		halves, err := ipnets.SubnetInto(azblocks[az], 2) // private is half the total network
+		if err != nil {
+			return nil, err
+		}
+
+		quarters, err := ipnets.SubnetInto(halves[1], 2) // public is quarter the total network
+		if err != nil {
+			return nil, err
+		}
+
+		eighths, err := ipnets.SubnetInto(quarters[1], 2) // protected is quarter the total network
+		if err != nil {
+			return nil, err
+		}
+
 		subnet.AvailabilityZones = append(subnet.AvailabilityZones, AvailabilityZone{
-			AZBlock:   block[start][0+az*1],
-			Private:   block[start+1][0+az*2],
-			Public:    block[start+2][2+az*4],
-			Protected: block[start+3][6+az*8],
+			AZBlock:   azblocks[az],
+			Private:   halves[0],   // first half of AZBlock
+			Public:    quarters[0], // third quarter of AZBlock
+			Protected: eighths[0],  // seventh eighth of AZBlock
+			// last eighth is unused
 		})
 	}
 
 	return &subnet, nil
-}
 
-func divideSubnets(ipnet *net.IPNet, depth int) ([][]*net.IPNet, error) {
-	block := make([][]*net.IPNet, depth+1) // slice of slices of IPNets
-	_, _ = ipnet.Mask.Size()               // TODO subnet
-
-	block[0] = []*net.IPNet{ipnet}
-
-	for i := 1; i < depth+1; i++ {
-		schan, err := ipv4utils.Subnet(*ipnet, uint(i))
-		if err != nil {
-			return nil, err
-		}
-		block[i] = make([]*net.IPNet, 0)
-		for subnet := range schan {
-			// make a copy of subnet, because memory reuse :(
-			var dupSubnet net.IPNet
-
-			dupIp := make(net.IP, len(subnet.IP))
-			copy(dupIp, subnet.IP)
-			dupSubnet.IP = dupIp
-
-			dupMask := make(net.IPMask, len(subnet.Mask))
-			copy(dupMask, subnet.Mask)
-			dupSubnet.Mask = dupMask
-			block[i] = append(block[i], &dupSubnet)
-		}
-	}
-
-	return block, nil
 }
