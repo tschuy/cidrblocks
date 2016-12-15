@@ -21,8 +21,28 @@ func Output(sn subnet.Subnet) (string, error) {
 		"newvpc" : {
 			"Type" : "AWS::EC2::VPC",
 			"Properties" : {
-				"CidrBlock" : "{{.cidrblock}}"
-			}
+				"CidrBlock" : "{{.cidrblock}}",
+				"EnableDnsHostnames": true,
+				"EnableDnsSupport": true
+			},
+			"newroute" : {
+				 "Type" : "AWS::EC2::Route",
+				 "DependsOn" : "GatewayToInternet",
+				 "Properties" : {
+						"RouteTableId" : { "Ref" : "myRouteTable" },
+						"DestinationCidrBlock" : "0.0.0.0/0",
+						"GatewayId" : { "Ref" : "newinternetgateway" }
+				 }
+			},
+			"newinternetgateway" : {
+			 "Type" : "AWS::EC2::InternetGateway"
+		 },
+		 "AttachGateway" : {
+			 "Type" : "AWS::EC2::VPCGatewayAttachment",
+			 "Properties" : {
+					"VpcId" : { "Ref" : "newvpc" },
+					"InternetGatewayId" : { "Ref" : "newinternetgateway" }
+			 }
 		}`)
 
 	if err != nil {
