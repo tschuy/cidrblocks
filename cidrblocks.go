@@ -9,6 +9,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/tschuy/cidrblocks/http"
+	"github.com/tschuy/cidrblocks/output/cloudformation"
 	"github.com/tschuy/cidrblocks/output/table"
 	"github.com/tschuy/cidrblocks/output/terraform"
 	"github.com/tschuy/cidrblocks/subnet"
@@ -82,8 +83,9 @@ func cli(cmd *cobra.Command, args []string) {
 	}
 
 	functions := map[string]func(subnet.Subnet) (string, error){
-		"table":     table.Output,
-		"terraform": terraform.Output,
+		"table":          table.Output,
+		"terraform":      terraform.Output,
+		"cloudformation": cloudformation.Output,
 	}
 
 	var cidrOut string
