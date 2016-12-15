@@ -24,25 +24,32 @@ func Output(sn subnet.Subnet) (string, error) {
 				"CidrBlock" : "{{.cidrblock}}",
 				"EnableDnsHostnames": true,
 				"EnableDnsSupport": true
-			},
-			"newroute" : {
-				 "Type" : "AWS::EC2::Route",
-				 "DependsOn" : "GatewayToInternet",
-				 "Properties" : {
-						"RouteTableId" : { "Ref" : "myRouteTable" },
+			}
+		},
+		"newroute" : {
+				"Type" : "AWS::EC2::Route",
+				"DependsOn" : "newinternetgateway",
+				"Properties" : {
+						"RouteTableId" : { "Ref" : "newroutetable" },
 						"DestinationCidrBlock" : "0.0.0.0/0",
 						"GatewayId" : { "Ref" : "newinternetgateway" }
-				 }
-			},
-			"newinternetgateway" : {
-			 "Type" : "AWS::EC2::InternetGateway"
-		 },
-		 "AttachGateway" : {
-			 "Type" : "AWS::EC2::VPCGatewayAttachment",
-			 "Properties" : {
+				}
+		},
+		"newinternetgateway" : {
+			"Type" : "AWS::EC2::InternetGateway"
+		},
+		"newroutetable" : {
+			"Type" : "AWS::EC2::RouteTable",
+			"Properties" : {
+					"VpcId" : { "Ref" : "newvpc" }
+			}
+		},
+		"AttachGateway" : {
+			"Type" : "AWS::EC2::VPCGatewayAttachment",
+			"Properties" : {
 					"VpcId" : { "Ref" : "newvpc" },
 					"InternetGatewayId" : { "Ref" : "newinternetgateway" }
-			 }
+			}
 		}`)
 
 	if err != nil {
