@@ -75,14 +75,14 @@ func cli(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	sn, err := subnet.New(ipnet, azs)
+	sn, extras, err := subnet.New(ipnet, azs)
 
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	functions := map[string]func(subnet.Subnet) (string, error){
+	functions := map[string]func(subnet.Subnet, *[]net.IPNet) (string, error){
 		"table":          table.Output,
 		"terraform":      terraform.Output,
 		"cloudformation": cloudformation.Output,
@@ -91,7 +91,7 @@ func cli(cmd *cobra.Command, args []string) {
 	var cidrOut string
 
 	if function, ok := functions[format]; ok {
-		cidrOut, err = function(*sn)
+		cidrOut, err = function(*sn, extras)
 	} else {
 		fmt.Println(fmt.Sprintf("format %s not recognized", format))
 		os.Exit(1)

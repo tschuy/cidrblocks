@@ -5,12 +5,25 @@ import (
 	"fmt"
 	"html/template"
 	"math"
+	"net"
 	"strconv"
 
 	"github.com/tschuy/cidrblocks/subnet"
 )
 
-func Output(sn subnet.Subnet) (string, error) {
+func Output(sn subnet.Subnet, extras *[]net.IPNet) (string, error) {
+
+	tmpl, err := template.New("table").Parse(`
+AZ {{ .az }} ({{ .azblock }}):
+	{{ .private}} (Private - {{ .privcount }} addresses)
+	{{ .public }} (Public - {{ .pubcount }} addresses)
+	{{ .protected }} (Protected - {{ .protcount }} addresses)
+	{{ .extra }} (Extra - {{ .extracount }} addresses)
+`)
+
+	if err != nil {
+		panic(err)
+	}
 
 	var buf bytes.Buffer
 
@@ -18,15 +31,6 @@ func Output(sn subnet.Subnet) (string, error) {
 	buf.WriteString(vpcr)
 
 	for k, v := range sn.AvailabilityZones {
-		tmpl, err := template.New("table").Parse(`
-AZ {{ .az }} ({{ .azblock }}):
-    {{ .private}} (Private - {{ .privcount }} addresses)
-      {{ .public }} (Public - {{ .pubcount }} addresses)
-        {{ .protected }} (Protected - {{ .protcount }} addresses)
-`)
-		if err != nil {
-			panic(err)
-		}
 
 		infomap := make(map[string]string)
 		infomap["az"] = subnet.AZName(k)
@@ -45,6 +49,10 @@ AZ {{ .az }} ({{ .azblock }}):
 		a, b = v.Protected.Mask.Size()
 		infomap["protcount"] = strconv.FormatFloat(math.Pow(2, float64(b-a)), 'f', 0, 64)
 
+		infomap["extra"] = v.Extra.String()
+		a, b = v.Extra.Mask.Size()
+		infomap["extracount"] = strconv.FormatFloat(math.Pow(2, float64(b-a)), 'f', 0, 64)
+
 		var tbl bytes.Buffer
 		err = tmpl.Execute(&tbl, infomap)
 		if err != nil {
@@ -53,5 +61,14 @@ AZ {{ .az }} ({{ .azblock }}):
 
 		buf.WriteString(tbl.String())
 	}
+
+	if len(*extras) != 0 {
+		buf.WriteString("\nUnused blocks:\n\t")
+		for _, e := range *extras {
+			buf.WriteString(e.String())
+			buf.WriteString("\n\t")
+		}
+	}
+
 	return buf.String(), nil
 }

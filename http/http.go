@@ -72,7 +72,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, string(errText), http.StatusBadRequest)
 		return
 	}
-	sn, err := subnet.New(params.ipnet, params.azs)
+	sn, extras, err := subnet.New(params.ipnet, params.azs)
 
 	if err != nil {
 		errText, _ := json.Marshal(JsonError{err.Error()})
@@ -82,13 +82,13 @@ func handle(w http.ResponseWriter, r *http.Request) {
 
 	var cidrOut string
 
-	functions := map[string]func(subnet.Subnet) (string, error){
+	functions := map[string]func(subnet.Subnet, *[]net.IPNet) (string, error){
 		"table":     table.Output,
 		"terraform": terraform.Output,
 	}
 
 	if function, ok := functions[params.format]; ok {
-		cidrOut, err = function(*sn)
+		cidrOut, err = function(*sn, extras)
 	} else {
 		errText, _ := json.Marshal(JsonError{fmt.Sprintf("format %s not recognized", params.format)})
 		http.Error(w, string(errText), http.StatusBadRequest)

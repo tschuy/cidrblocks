@@ -13,7 +13,7 @@ type block struct {
 	Type string
 }
 
-func Output(sn subnet.Subnet) (string, error) {
+func Output(sn subnet.Subnet, extras *[]net.IPNet) (string, error) {
 	var buf bytes.Buffer
 	tmplPreamble, err := template.New("preamble").Parse(`variable "cidr_block" {
     type = "string"
