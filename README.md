@@ -86,7 +86,7 @@ Web Service
 
 Alternatively, `cidrblocks` can be run as a web service:
 
-`(cidrblocks)(master) → ./cidrblocks serve --port=8080`
+`(cidrblocks)(master) → ./cidrblocks serve --port=8087`
 
 → `http://localhost:8087/?format=table&cidr=10.0.0.0/8`  
 → `http://localhost:8087/?format=cloudformation&cidr=10.0.0.0/8&azs=2`
