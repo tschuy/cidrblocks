@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"html/template"
 	"net"
+	"strconv"
 
 	"github.com/tschuy/cidrblocks/subnet"
 )
@@ -13,9 +14,8 @@ type block struct {
 	Type string
 }
 
-func Output(sn subnet.Subnet, extras *[]net.IPNet) (string, error) {
-	var buf bytes.Buffer
-	tmplPreamble, err := template.New("preamble").Parse(`variable "cidr_block" {
+const (
+	PREAMBLE = `variable "cidr_block" {
     type = "string"
     default = "{{.cidrblock}}"
 }
@@ -29,6 +29,9 @@ data "aws_region" "default" {
   current = true
 }
 
+# current availability zones
+data "aws_availability_zones" "available" {}
+
 # Create a VPC to launch our instances into
 resource "aws_vpc" "default" {
     cidr_block = "${var.cidr_block}"
@@ -37,7 +40,7 @@ resource "aws_vpc" "default" {
 
 # Grant the VPC internet access on its main route table
 resource "aws_route" "internet_access" {
-    route_table_id         = "${aws_vpc.default.main_route_table_id}"
+    route_table_id         = "${aws_route_table.route_table_public.id}"
     destination_cidr_block = "0.0.0.0/0"
     gateway_id             = "${aws_internet_gateway.default.id}"
 }
@@ -48,21 +51,74 @@ resource "aws_internet_gateway" "default" {
     tags {
             Name = "vpc-igw"
           }
-}`)
+}
 
+resource "aws_route_table" "route_table_public" {
+    vpc_id = "${aws_vpc.default.id}"
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = "${aws_internet_gateway.default.id}"
+    }
+}
+`
+
+	SUBNET = `
+
+resource "aws_subnet" "az_{{.az}}_{{.function}}" {
+    vpc_id                  = "${aws_vpc.default.id}"
+    cidr_block              = "{{.cidrblockInner}}"
+    availability_zone       = "${data.aws_availability_zones.available.names[{{.az}}]}"
+    map_public_ip_on_launch = {{if eq .function "public"}}true{{else}}false{{end}}
+}
+
+resource "aws_route_table_association" "association_{{.az}}_{{.function}}" {
+    subnet_id = "${aws_subnet.az_{{.az}}_{{.function}}.id}"
+	  depends_on = ["aws_route_table.route_table_{{.function}}{{if eq .function "public"}}{{else}}_{{.az}}{{end}}"]
+    route_table_id = "${aws_route_table.route_table_{{.function}}{{if eq .function "public"}}{{else}}_{{.az}}{{end}}.id}"
+}
+`
+	ROUTING = `
+
+resource "aws_nat_gateway" "nat_gateway_{{.az}}" {
+  allocation_id = "${aws_eip.eip_nat_{{.az}}.id}"
+  subnet_id = "${aws_subnet.az_{{.az}}_public.id}"
+
+  depends_on = ["aws_internet_gateway.default"]
+}
+
+resource "aws_eip" "eip_nat_{{.az}}" {
+  vpc = true
+}
+
+resource "aws_route" "route_private_{{.az}}" {
+    route_table_id         = "${aws_route_table.route_table_private_{{.az}}.id}"
+    destination_cidr_block = "0.0.0.0/0"
+    nat_gateway_id         = "${aws_nat_gateway.nat_gateway_{{.az}}.id}"
+}
+
+resource "aws_route_table" "route_table_private_{{.az}}" {
+    vpc_id = "${aws_vpc.default.id}"
+}
+
+resource "aws_route_table" "route_table_protected_{{.az}}" {
+    vpc_id = "${aws_vpc.default.id}"
+}
+`
+)
+
+func Output(sn subnet.Subnet, extras *[]net.IPNet) (string, error) {
+	var buf bytes.Buffer
+	tmplPreamble, err := template.New("preamble").Parse(PREAMBLE)
 	if err != nil {
 		return "", err
 	}
 
-	tmplAZ, err := template.New("az").Parse(`
+	tmplSubnet, err := template.New("subnet").Parse(SUBNET)
+	if err != nil {
+		return "", err
+	}
 
-resource "aws_subnet" "AZ-{{.az}}-{{.function}}" {
-vpc_id                  = "${aws_vpc.default.id}"
-cidr_block              = "{{.cidrblockInner}}"
-availability_zone       = "${data.aws_region.default.name}{{.az}}"
-map_public_ip_on_launch = false
-}`)
-
+	tmplRouting, err := template.New("routing").Parse(ROUTING)
 	if err != nil {
 		return "", err
 	}
@@ -70,12 +126,14 @@ map_public_ip_on_launch = false
 	tmplPreamble.Execute(&buf, map[string]string{"cidrblock": sn.VPC.String()})
 	for k, v := range sn.AvailabilityZones {
 		for _, t := range []block{{v.Public, "public"}, {v.Private, "private"}, {v.Protected, "protected"}} {
-			tmplAZ.Execute(&buf, map[string]string{
-				"az":             subnet.AZName(k),
+			tmplSubnet.Execute(&buf, map[string]string{
+				"az":             strconv.Itoa(k),
 				"cidrblockInner": t.Addr.String(),
 				"function":       t.Type,
 			})
 		}
+
+		tmplRouting.Execute(&buf, map[string]string{"az": strconv.Itoa(k)})
 	}
 
 	return buf.String(), nil

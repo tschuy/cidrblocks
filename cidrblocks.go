@@ -43,7 +43,7 @@ func main() {
 
 	rootCmd.Flags().StringVarP(&cidr, "cidr", "c", "", red("[required] root cidr block (ex: 10.0.0.0/8)"))
 	rootCmd.Flags().IntVarP(&azs, "azs", "a", 4, "number of availability zones (power of two)")
-	rootCmd.Flags().StringVarP(&format, "format", "f", "table", "format of output (table or terraform)")
+	rootCmd.Flags().StringVarP(&format, "format", "f", "table", "format of output (table | terraform | cloudformation)")
 
 	serveCmd := &cobra.Command{
 		Use:  "serve",
