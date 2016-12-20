@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"html/template"
 	"net"
+	"strconv"
 
 	"github.com/tschuy/cidrblocks/subnet"
 )
@@ -13,12 +14,11 @@ type block struct {
 	Type string
 }
 
-func Output(sn subnet.Subnet) (string, error) {
-	var buf bytes.Buffer
-	tmplPreamble, err := template.New("preamble").Parse(`{
+const (
+	PREAMBLE = `{
 	"AWSTemplateFormatVersion" : "2010-09-09",
 	"Resources" : {
-		"newvpc" : {
+		"vpc" : {
 			"Type" : "AWS::EC2::VPC",
 			"Properties" : {
 				"CidrBlock" : "{{.cidrblock}}",
@@ -26,69 +26,137 @@ func Output(sn subnet.Subnet) (string, error) {
 				"EnableDnsSupport": true
 			}
 		},
-		"newroute" : {
+		"internetroute" : {
 				"Type" : "AWS::EC2::Route",
-				"DependsOn" : "newinternetgateway",
+				"DependsOn" : "internetgateway",
 				"Properties" : {
-						"RouteTableId" : { "Ref" : "newroutetable" },
+						"RouteTableId" : { "Ref" : "internetroutetable" },
 						"DestinationCidrBlock" : "0.0.0.0/0",
-						"GatewayId" : { "Ref" : "newinternetgateway" }
+						"GatewayId" : { "Ref" : "internetgateway" }
 				}
 		},
-		"newinternetgateway" : {
+		"internetgateway" : {
 			"Type" : "AWS::EC2::InternetGateway"
 		},
-		"newroutetable" : {
+		"internetroutetable" : {
 			"Type" : "AWS::EC2::RouteTable",
 			"Properties" : {
-					"VpcId" : { "Ref" : "newvpc" }
+					"VpcId" : { "Ref" : "vpc" }
 			}
 		},
 		"AttachGateway" : {
 			"Type" : "AWS::EC2::VPCGatewayAttachment",
 			"Properties" : {
-					"VpcId" : { "Ref" : "newvpc" },
-					"InternetGatewayId" : { "Ref" : "newinternetgateway" }
+					"VpcId" : { "Ref" : "vpc" },
+					"InternetGatewayId" : { "Ref" : "internetgateway" }
 			}
-		}`)
+		}`
 
-	if err != nil {
-		return "", err
-	}
+	AZ = `,
+		"natgateway{{.az}}" : {
+			"DependsOn" : "AttachGateway",
+			"Type" : "AWS::EC2::NatGateway",
+			"Properties" : {
+				"AllocationId" : { "Fn::GetAtt" : ["eipnat{{.az}}", "AllocationId"]},
+				"SubnetId" : { "Ref" : "az{{.az}}public"}
+			}
+		},
+		"eipnat{{.az}}" : {
+			"Type" : "AWS::EC2::EIP",
+			"Properties" : {
+				"Domain" : "vpc"
+			},
+			"DependsOn" : "AttachGateway"
+		},
+		"route{{.az}}" : {
+			"Type" : "AWS::EC2::Route",
+			"Properties" : {
+				"RouteTableId" : { "Ref" : "privateroutetable{{.az}}" },
+				"DestinationCidrBlock" : "0.0.0.0/0",
+				"NatGatewayId" : { "Ref" : "natgateway{{.az}}" }
+			}
+		},
+		"privateroutetable{{.az}}" : {
+			"Type" : "AWS::EC2::RouteTable",
+			"Properties" : {
+				"VpcId" : { "Ref" : "vpc" }
+			}
+		},
+		"az{{.az}}privatesubnetrouteassociation" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "az{{.az}}private" },
+				"RouteTableId" : { "Ref" : "privateroutetable{{.az}}" }
+			}
+		},
+		"az{{.az}}publicsubnetrouteassociation" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "az{{.az}}public" },
+				"RouteTableId" : { "Ref" : "internetroutetable" }
+			}
+		}`
 
-	tmplOutro, err := template.New("outro").Parse(`
-	}
-}
-`)
-
-	if err != nil {
-		return "", err
-	}
-
-	tmplAZ, err := template.New("az").Parse(`,
+	SUBNET = `,
 		"az{{.az}}{{.function}}" : {
 			"Type" : "AWS::EC2::Subnet",
-			"Properties" : {
-				"VpcId" : { "Ref" : "newvpc" },
+			"Properties" : { {{if eq .function "public"}}
+				"MapPublicIpOnLaunch": true,{{end}}
+				"VpcId" : { "Ref" : "vpc" },
 				"CidrBlock" : "{{.cidrblockInner}}",
-				"AvailabilityZone" : "{{.region}}{{.az}}"
+				"AvailabilityZone" : {
+					"Fn::Select" : [ "{{.az}}", { "Fn::GetAZs" : "" } ]
+				}
 			}
-		}`)
+		}`
 
+	OUTRO = `
+	}
+}`
+)
+
+func Output(sn subnet.Subnet) (string, error) {
+	var buf bytes.Buffer
+
+	tmplPreamble, err := template.New("preamble").Parse(PREAMBLE)
 	if err != nil {
 		return "", err
 	}
+
+	tmplAZ, err := template.New("az").Parse(AZ)
+	if err != nil {
+		return "", err
+	}
+
+	tmplOutro, err := template.New("outro").Parse(OUTRO)
+	if err != nil {
+		return "", err
+	}
+
+	tmplSubnet, err := template.New("subnet").Parse(SUBNET)
+	if err != nil {
+		return "", err
+	}
+
+	tmplSubnet = tmplSubnet.Funcs(template.FuncMap{
+		"eq": func(a, b interface{}) bool {
+			return a == b
+		},
+	})
 
 	tmplPreamble.Execute(&buf, map[string]string{"cidrblock": sn.VPC.String()})
 	for k, v := range sn.AvailabilityZones {
 		for _, t := range []block{{v.Public, "public"}, {v.Private, "private"}, {v.Protected, "protected"}} {
-			tmplAZ.Execute(&buf, map[string]string{
+			tmplSubnet.Execute(&buf, map[string]string{
 				"region":         "us-east-1", // sane way to set this needed (or way to set AZ without region?)
-				"az":             subnet.AZName(k),
 				"cidrblockInner": t.Addr.String(),
 				"function":       t.Type,
+				"az":             strconv.Itoa(k),
 			})
 		}
+		tmplAZ.Execute(&buf, map[string]string{
+			"az": strconv.Itoa(k),
+		})
 	}
 	tmplOutro.Execute(&buf, nil)
 

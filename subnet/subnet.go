@@ -1,7 +1,6 @@
 package subnet
 
 import (
-	"math"
 	"net"
 
 	"github.com/dghubble/ipnets"
@@ -20,28 +19,11 @@ type AvailabilityZone struct {
 }
 
 func AZName(k int) string {
-	// for the ever-present fear that you might suddenly use more than 26
-	// availability zones!
-	var char int
-	// for 26, = 1, for 27, = 2
-	// log(a)/log(b) = log base b of a
-	// start at 1 instead of 0
-	strLen := int(math.Floor(math.Log(float64(k))/math.Log(26) + 1))
-	if strLen < 0 {
-		// unfortunately, log(0) = -inf
-		// we can't just add one to the log, as this would make k=26 have strLen
-		// of 2, and not 1
-		strLen = 1
-	}
-	name := make([]byte, strLen)
-	k = k + 1 // so we start at A and not at space
-	for i := strLen; i > 0; i-- {
-		k = k - 1
-		char = k % 26
-		k = k / 26
-		name[i-1] = byte(char + 65)
-	}
-	return string(name)
+	return string(char + 97) // we will never have more than 26 AZs
+	// currently, the maximum number of AZs Amazon has in any region appears
+	// to be around five-ish (us-east-1 goes from a-e)
+	// if you're looking at this comment to try to add support for 27+, check
+	// git history to get the answer for free.
 }
 
 func New(ipnet *net.IPNet, azs int) (*Subnet, error) {
