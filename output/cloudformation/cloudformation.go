@@ -82,6 +82,19 @@ const (
 				"VpcId" : { "Ref" : "vpc" }
 			}
 		},
+		"protectedroutetable{{.az}}" : {
+			"Type" : "AWS::EC2::RouteTable",
+			"Properties" : {
+				"VpcId" : { "Ref" : "vpc" }
+			}
+		},
+		"az{{.az}}protectedsubnetrouteassociation" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "az{{.az}}protected" },
+				"RouteTableId" : { "Ref" : "protectedroutetable{{.az}}" }
+			}
+		},
 		"az{{.az}}privatesubnetrouteassociation" : {
 			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
 			"Properties" : {
