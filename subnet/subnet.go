@@ -40,7 +40,7 @@ func New(ipnet *net.IPNet, azs int) (*Subnet, *[]net.IPNet, error) {
 	// split into the number of necessary blocks for AZs
 	splits := timesSplit(azs)
 
-	azblocks, err := ipnets.SubnetInto(*ipnet, timesSplit(azs))
+	azblocks, err := ipnets.SubnetInto(ipnet, timesSplit(azs))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -65,17 +65,17 @@ func New(ipnet *net.IPNet, azs int) (*Subnet, *[]net.IPNet, error) {
 		}
 
 		subnet.AvailabilityZones = append(subnet.AvailabilityZones, AvailabilityZone{
-			AZBlock:   azblocks[az],
-			Private:   halves[0],   // first half of AZBlock
-			Public:    quarters[0], // third quarter of AZBlock
-			Protected: eighths[0],  // seventh eighth of AZBlock
-			Extra:     eighths[1],  // last eighth of AZBlock is reserved for future use
+			AZBlock:   *azblocks[az],
+			Private:   *halves[0],   // first half of AZBlock
+			Public:    *quarters[0], // third quarter of AZBlock
+			Protected: *eighths[0],  // seventh eighth of AZBlock
+			Extra:     *eighths[1],  // last eighth of AZBlock is reserved for future use
 		})
 	}
 
 	var extras []net.IPNet
 	for t := azs; t < splits; t++ {
-		extras = append(extras, azblocks[t])
+		extras = append(extras, *azblocks[t])
 	}
 
 	return &subnet, &extras, nil
