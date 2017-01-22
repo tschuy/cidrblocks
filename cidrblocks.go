@@ -9,6 +9,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/tschuy/cidrblocks/http"
+	awscli "github.com/tschuy/cidrblocks/output/cli"
 	"github.com/tschuy/cidrblocks/output/cloudformation"
 	"github.com/tschuy/cidrblocks/output/table"
 	"github.com/tschuy/cidrblocks/output/terraform"
@@ -75,6 +76,7 @@ func cli(cmd *cobra.Command, args []string) {
 		"table":          table.Output,
 		"terraform":      terraform.Output,
 		"cloudformation": cloudformation.Output,
+		"cli":            awscli.Output,
 	}
 
 	var cidrOut string
