@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/tschuy/cidrblocks/output/cloudformation"
 	"github.com/tschuy/cidrblocks/output/table"
 	"github.com/tschuy/cidrblocks/output/terraform"
 	"github.com/tschuy/cidrblocks/subnet"
@@ -83,8 +84,9 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	var cidrOut string
 
 	functions := map[string]func(subnet.Subnet, *[]net.IPNet) (string, error){
-		"table":     table.Output,
-		"terraform": terraform.Output,
+		"cloudformation": cloudformation.Output,
+		"table":          table.Output,
+		"terraform":      terraform.Output,
 	}
 
 	if function, ok := functions[params.format]; ok {
